@@ -5,7 +5,8 @@ module.exports =
       from: [
         'Itinerary@ryanair.com'
       ]
-      scan: (mail, callback, api) ->
+      match: /https:\/\/www.ryanair.com\/([\w_]+)\/?\?cmpid=itinerarymail_([\w_]+)/
+      scan: (mail, callback, api, current) ->
         $ = api.cheerio.load mail.html
         base = $ 'center > table > tbody > tr > td'
 
@@ -18,12 +19,13 @@ module.exports =
         data =
           ident:
             pnr: $('table:nth-child(2) > tbody > tr > td:nth-child(2) > center > div > table > tbody > tr > td:nth-child(1) > div:nth-child(3)', base).text()
-          price: $('table:nth-child(5) > tbody > tr > td:nth-child(2) > center > div > table > tbody > tr > td:nth-child(3) > b', base).text()
+          price: api.extractPrice $('table:nth-child(5) > tbody > tr > td:nth-child(2) > center > div > table > tbody > tr > td:nth-child(3) > b', base).text()
           payment:
             card_type: payment.split('\n')[2].trim()
             card_ending: payment.match(/(\d+)$/)[1]
           items: []
           passengers: []
+          locale: mail.html.match(current.match)?[1]
 
         ############################
         # FLIGHTS                  #
@@ -62,7 +64,7 @@ module.exports =
 
         getPassenger = (i=1) ->
           pg = $('table:nth-child(4) > tbody > tr > td:nth-child(2) > center > div > table:nth-child(2) > tbody > tr:nth-child('+(i+1)+') > td:nth-child(1) > table:nth-child(1) b', base).text()
-          if pg then data.passengers.push pg
+          if pg then data.passengers.push { name: pg }
 
         for i in [1..9] then getPassenger(i)
         callback null, data
